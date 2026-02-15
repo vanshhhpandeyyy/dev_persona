@@ -76,8 +76,11 @@ Users should be able to:
 ## 7. System Requirements
 
 Operating System: Windows 10/11, macOS 12+, or Linux (Ubuntu 20.04+ recommended)
+
 RAM: 8 GB (comfortable for the app + browser; 4 GB might work but feel slow with multiple tabs)
+
 Internet: Required (for calling Grok/OpenAI/Hugging Face APIs; no offline mode unless you add local LLM later)
+
 Browser: Modern Chrome, Edge, Firefox, or Safari (for viewing the app UI)
 
 ## 8. Expected Outcome
