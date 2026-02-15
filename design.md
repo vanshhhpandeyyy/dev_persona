@@ -1,6 +1,6 @@
 ## 1. System Overview
 
-DevPair Personas is a web-based intelligent code review platform.
+dev_persona is a web-based intelligent code review platform.
 
 The system consists of:
 
@@ -99,4 +99,4 @@ The system will be deployed on cloud infrastructure with:
 
 ## 8. Summary
 
-dev_personas is designed as a scalable, secure, and efficient automated code review platform.
+dev_persona is designed as a scalable, secure, and efficient automated code review platform.
