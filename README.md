@@ -1,8 +1,6 @@
-# dev_persona – Requirements Document
-
 ## 1. Introduction
 
-DevPair Personas is an intelligent code review platform designed to automatically analyze source code and provide expert-level feedback on security, performance, and architecture.
+Dev_personas is an intelligent code review platform designed to automatically analyze source code and provide expert-level feedback on security, performance, and architecture.
 
 The system helps developers improve code quality, reduce vulnerabilities, and optimize performance efficiently.
 
