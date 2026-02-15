@@ -1,4 +1,4 @@
-# dev_ersona – Requirements Document
+# dev_persona – Requirements Document
 
 ## 1. Introduction
 
