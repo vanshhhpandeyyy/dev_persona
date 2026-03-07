@@ -56,13 +56,13 @@ ${code}
       content: result.outputs?.[0]?.text ?? "No response generated"
     };
 
-  } catch (error) {
-
-    return {
-      name: roleName,
-      content: "",
-      error: error.message
-    };
+  }catch (error: any) {
+  return {
+    name: roleName,
+    content: "",
+    error: error.message
+  };
+}
 
   }
 }
