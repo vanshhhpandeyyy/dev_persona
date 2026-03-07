@@ -7,7 +7,7 @@ const client = new BedrockRuntimeClient({
   region: "us-east-1"
 });
 
-async function runPersona(id, roleName, code) {
+async function runPersona(id: string, roleName: string, code: string) {
   try {
 
     const prompt = `<s>[INST]
