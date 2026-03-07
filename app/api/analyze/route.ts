@@ -56,7 +56,8 @@ ${code}
       content: result.outputs?.[0]?.text ?? "No response generated"
     };
 
-  }catch (error: any) {
+  }
+  catch (error: any) {
   return {
     name: roleName,
     content: "",
@@ -64,8 +65,6 @@ ${code}
   };
 }
 
-  }
-}
 
 export async function POST(req) {
 
