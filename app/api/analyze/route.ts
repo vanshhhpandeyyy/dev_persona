@@ -48,7 +48,7 @@ ${code}
 
     const response = await client.send(command);
 
-    const decoded = new TextDecoder().decode(response.body);
+    const decoded = new TextDecoder().decode(response.body as Uint8Array);
     const result = JSON.parse(decoded);
 
     return {
@@ -56,17 +56,16 @@ ${code}
       content: result.outputs?.[0]?.text ?? "No response generated"
     };
 
+  } catch (error: any) {
+    return {
+      name: roleName,
+      content: "",
+      error: error.message
+    };
   }
-  catch (error: any) {
-  return {
-    name: roleName,
-    content: "",
-    error: error.message
-  };
 }
 
-
-export async function POST(req) {
+export async function POST(req: Request) {
 
   try {
 
@@ -96,7 +95,7 @@ export async function POST(req) {
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
 
     console.error("API error:", error);
 
