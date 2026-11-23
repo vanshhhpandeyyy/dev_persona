@@ -1,107 +1,162 @@
-import {
-  BedrockRuntimeClient,
-  InvokeModelCommand
-} from "@aws-sdk/client-bedrock-runtime";
+type PersonaId = "senior-engineer" | "security-engineer" | "architect";
 
-const client = new BedrockRuntimeClient({
-  region: "us-east-1"
-});
+const PERSONAS: { id: PersonaId; name: string; focus: string }[] = [
+  {
+    id: "senior-engineer",
+    name: "Senior Software Engineer",
+    focus: "Correctness, bugs, edge cases, readability, maintainability, testing, and practical refactoring.",
+  },
+  {
+    id: "security-engineer",
+    name: "Security Engineer",
+    focus: "Security vulnerabilities, trust boundaries, input validation, authentication, authorization, injection, secrets, and remediation.",
+  },
+  {
+    id: "architect",
+    name: "Software Architect",
+    focus: "Architecture, separation of concerns, coupling, cohesion, scalability, performance, reliability, and long-term maintainability.",
+  },
+];
 
-async function runPersona(id: string, roleName: string, code: string) {
-  try {
+async function runPersona(persona: (typeof PERSONAS)[number], code: string, apiKey: string) {
+  const prompt = `You are acting as a ${persona.name}. Review the supplied source code with this focus: ${persona.focus}
 
-    const prompt = `<s>[INST]
-You are a ${roleName}.
+Be specific. Do not invent files, dependencies, runtime behavior, or vulnerabilities. If something cannot be established from the snippet, say so. Preserve the original language and framework.
 
-Analyze the provided code and respond STRICTLY in this format:
+Return exactly these sections:
+## Overall Assessment
+A concise summary.
 
 ## Improved Code
-\`\`\`javascript
-// improved version here
-\`\`\`
+Provide a complete improved version when the supplied snippet is self-contained. If it is not self-contained, provide a targeted patch or explain what additional context is needed. Never replace missing context with fabricated code.
 
 ## Explanation
-Explain briefly what was improved and why (3–6 lines max).
+Explain the most important changes.
 
 ## Issues Found
-List issues found in the original code (if any).
+List concrete issues, or state none identified.
 
 ## Suggestions
-Optional improvements for production-level quality.
+Give prioritized next steps.
 
-Code to analyze:
+Code to review:
+\`\`\`
 ${code}
+\`\`\``;
 
-[/INST]`;
-
-    const command = new InvokeModelCommand({
-      modelId: "mistral.mistral-7b-instruct-v0:2",
-      contentType: "application/json",
-      accept: "application/json",
+  const response = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
       body: JSON.stringify({
-        prompt,
-        max_tokens: 700,
-        temperature: 0.4,
-        top_p: 0.9
-      })
-    });
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.25,
+          maxOutputTokens: 1800,
+        },
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(55000),
+    }
+  );
 
-    const response = await client.send(command);
+  const payload = await response.json().catch(() => ({}));
 
-    const decoded = new TextDecoder().decode(response.body as Uint8Array);
-    const result = JSON.parse(decoded);
-
-    return {
-      name: roleName,
-      content: result.outputs?.[0]?.text ?? "No response generated"
-    };
-
-  } catch (error: any) {
-    return {
-      name: roleName,
-      content: "",
-      error: error.message
-    };
+  if (!response.ok) {
+    const message =
+      payload?.error?.message ||
+      `Gemini API request failed (HTTP ${response.status}).`;
+    throw new Error(message);
   }
+
+  const text = payload?.candidates?.[0]?.content?.parts
+    ?.map((part: { text?: string }) => part.text ?? "")
+    .join("")
+    .trim();
+
+  if (!text) {
+    throw new Error("Gemini returned an empty response. Please try again.");
+  }
+
+  return { name: persona.name, content: text };
 }
 
 export async function POST(req: Request) {
-
   try {
+    const apiKey = process.env.GEMINI_API_KEY;
 
-    const { code } = await req.json();
-
-    if (!code || !code.trim()) {
-      return Response.json({
-        error: "Code is required"
-      }, { status: 400 });
+    if (!apiKey) {
+      return Response.json(
+        {
+          error:
+            "Server setup incomplete: GEMINI_API_KEY is missing. Add it in your Vercel project environment variables, then redeploy.",
+        },
+        { status: 503 }
+      );
     }
 
-    const [
-      senior,
-      security,
-      architect
-    ] = await Promise.all([
-      runPersona("senior-engineer", "Senior Software Engineer", code),
-      runPersona("security-engineer", "Security Engineer", code),
-      runPersona("architect", "Software Architect", code)
-    ]);
+    const body = await req.json().catch(() => null);
+    const code = typeof body?.code === "string" ? body.code.trim() : "";
 
-    return Response.json({
-      results: {
-        "senior-engineer": senior,
-        "security-engineer": security,
-        "architect": architect
-      }
-    });
+    if (!code) {
+      return Response.json({ error: "Please provide code to analyze." }, { status: 400 });
+    }
 
-  } catch (error: any) {
+    if (code.length > 30000) {
+      return Response.json(
+        { error: "Please keep the code under 30,000 characters for one review." },
+        { status: 413 }
+      );
+    }
 
-    console.error("API error:", error);
+    const settled = await Promise.all(
+      PERSONAS.map(async (persona) => {
+        try {
+          return {
+            id: persona.id,
+            ...(await runPersona(persona, code, apiKey)),
+          };
+        } catch (error) {
+          return {
+            id: persona.id,
+            name: persona.name,
+            content: "",
+            error: error instanceof Error ? error.message : "Unknown AI provider error.",
+          };
+        }
+      })
+    );
 
-    return Response.json({
-      error: error.message
-    }, { status: 500 });
+    const results = Object.fromEntries(
+      settled.map(({ id, ...result }) => [id, result])
+    );
 
+    const failed = settled.filter((result) => result.error);
+    if (failed.length === PERSONAS.length) {
+      return Response.json(
+        {
+          error: `All three reviews failed. First error: ${failed[0].error}`,
+          results,
+        },
+        { status: 502 }
+      );
+    }
+
+    return Response.json({ results });
+  } catch (error) {
+    console.error("Analyze API error:", error);
+    return Response.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unexpected server error while analyzing code.",
+      },
+      { status: 500 }
+    );
   }
 }
