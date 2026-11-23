@@ -1,3 +1,5 @@
+export const maxDuration = 60;
+
 type PersonaId = "senior-engineer" | "security-engineer" | "architect";
 
 const PERSONAS: { id: PersonaId; name: string; focus: string }[] = [
