@@ -1,7 +1,4 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  // Enable standalone output for AWS Lambda / Docker / serverless
-  output: 'standalone',
-};
+const nextConfig = {};
 
 module.exports = nextConfig;
