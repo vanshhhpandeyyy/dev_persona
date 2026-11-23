@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 type PersonaResult = {
   name: string;
@@ -138,12 +138,9 @@ export default function Home() {
                     {hasError ? (
                       <p className="card-error">{r.error}</p>
                     ) : (
-                      <div
-                        className="card-content markdown"
-                        dangerouslySetInnerHTML={{
-                          __html: simpleMarkdown(r.content),
-                        }}
-                      />
+                      <div className="card-content markdown">
+                        {renderReview(r.content)}
+                      </div>
                     )}
                   </div>
                 </article>
@@ -160,31 +157,55 @@ export default function Home() {
   );
 }
 
-function simpleMarkdown(text: string): string {
-  const escape = (s: string) =>
-    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  let out = escape(text)
-    .replace(/^### (.+)$/gm, '<h4>$1</h4>')
-    .replace(/^## (.+)$/gm, '<h4>$1</h4>')
-    .replace(/^# (.+)$/gm, '<h4>$1</h4>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>');
-  const lines = out.split('\n');
-  const blocks: string[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    if (line.startsWith('<')) {
-      blocks.push(line);
-      i++;
-    } else if (line.trim() === '') {
-      blocks.push('<br/>');
-      i++;
-    } else {
-      blocks.push('<p>' + line + '</p>');
-      i++;
+function renderReview(markdown: string): ReactNode {
+  const chunks: ReactNode[] = [];
+  const codeFence = /```([^\\n]*)\\n([\\s\\S]*?)```/g;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  const renderText = (value: string) => {
+    const lines = value.split('\\n');
+    const nodes: ReactNode[] = [];
+    let paragraph: string[] = [];
+    const flushParagraph = () => {
+      if (paragraph.length) {
+        nodes.push(<p key={key++}>{paragraph.join(' ')}</p>);
+        paragraph = [];
+      }
+    };
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        flushParagraph();
+      } else if (trimmed.startsWith('## ')) {
+        flushParagraph();
+        nodes.push(<h4 key={key++}>{trimmed.slice(3)}</h4>);
+      } else if (trimmed.startsWith('# ')) {
+        flushParagraph();
+        nodes.push(<h4 key={key++}>{trimmed.slice(2)}</h4>);
+      } else if (/^[-*] /.test(trimmed)) {
+        flushParagraph();
+        nodes.push(<p key={key++}>• {trimmed.slice(2)}</p>);
+      } else {
+        paragraph.push(trimmed);
+      }
     }
+    flushParagraph();
+    return nodes;
+  };
+
+  while ((match = codeFence.exec(markdown)) !== null) {
+    if (match.index > cursor) {
+      chunks.push(...renderText(markdown.slice(cursor, match.index)));
+    }
+    chunks.push(<pre key={key++}><code>{match[2]}</code></pre>);
+    cursor = match.index + match[0].length;
   }
-  return blocks.join('');
+
+  if (cursor < markdown.length) {
+    chunks.push(...renderText(markdown.slice(cursor)));
+  }
+  return chunks;
 }
