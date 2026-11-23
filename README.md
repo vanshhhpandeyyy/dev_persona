@@ -1,73 +1,81 @@
 # DevPersona AI
 
-Full-stack Next.js 14 app that analyzes code using three AI personas: **Senior Software Engineer**, **Security Engineer**, and **Software Architect**.
+DevPersona AI reviews a code snippet from three perspectives:
 
-## Features
+- **Senior Software Engineer** — correctness, maintainability, testing, and refactoring
+- **Security Engineer** — vulnerabilities, trust boundaries, input validation, and remediation
+- **Software Architect** — structure, scalability, performance, and long-term maintainability
 
-- **Code input** — Paste or type code in the text area
-- **Analyze** — One click sends the code to the backend
-- **3 response cards** — One response per persona with structured feedback
+## Stack
 
-## Setup
+- Next.js App Router (Next.js 16)
+- React 18 and TypeScript
+- Google Gemini API (server-side REST call)
 
-1. **Install dependencies**
+## Run locally
+
+1. Install Node.js 20.9 or newer.
+2. Install dependencies:
 
    ```bash
    npm install
    ```
 
-2. **Environment**
-
-   Copy `.env.example` to `.env` and set your Hugging Face token:
+3. Copy the example environment file and add a Gemini API key:
 
    ```bash
-   cp .env.example .env
+   cp .env.example .env.local
    ```
 
-   Edit `.env`:
+   Create a key at https://aistudio.google.com/apikey and set:
 
-   ```
-   HF_TOKEN=your-hf-api-token-here
+   ```env
+   GEMINI_API_KEY=your_actual_key
    ```
 
-3. **Run locally**
+4. Start the development server:
 
    ```bash
    npm run dev
    ```
 
-   Open [http://localhost:3000](http://localhost:3000).
+5. Open http://localhost:3000.
+
+## Deploy on Vercel
+
+1. Import this GitHub repository into a Vercel project.
+2. Select the Next.js framework preset (normally detected automatically).
+3. Add `GEMINI_API_KEY` under Project Settings → Environment Variables for Production (and Preview if needed).
+4. Deploy the `main` branch.
+
+Do not put the API key in frontend code, commit it to Git, or expose it through a `NEXT_PUBLIC_*` variable. The API route reads it only on the server.
 
 ## API
 
-- **POST /api/analyze**
-  - Body: `{ "code": "your code string" }`
-  - Returns: `{ "results": { "senior-engineer": { "name", "content" }, "security-engineer": { ... }, "architect": { ... } } }`
-  - Errors: 400 (missing/invalid body), 500 (missing `HF_TOKEN` or Hugging Face API failure)
+### `POST /api/analyze`
 
-## AWS Lambda deployment
+Request:
 
-The app is built for serverless compatibility:
+```json
+{ "code": "const answer = 42;" }
+```
 
-- **Standalone output** — `next.config.js` uses `output: 'standalone'` so you can run the app in a single Node process (e.g. in a Lambda handler or container).
-- **Stateless API** — `/api/analyze` does not rely on in-memory state or long-lived connections; it only reads the request body and calls the Hugging Face API (Mistral-7B-Instruct-v0.2).
-- **Environment** — All configuration is via `HF_TOKEN`; no file system or server-specific assumptions.
+Success response:
 
-### Deploying to Lambda
+```json
+{
+  "results": {
+    "senior-engineer": { "name": "Senior Software Engineer", "content": "..." },
+    "security-engineer": { "name": "Security Engineer", "content": "..." },
+    "architect": { "name": "Software Architect", "content": "..." }
+  }
+}
+```
 
-Common options:
+Each persona is handled independently. A provider error for one persona is returned in that persona's `error` field; if all three fail, the route returns HTTP 502. Empty input returns HTTP 400, input over 30,000 characters returns HTTP 413, and missing server configuration returns HTTP 503.
 
-1. **AWS Amplify** — Connect the repo; Amplify builds and deploys Next.js and runs API routes as serverless functions.
-2. **Serverless Framework + OpenNext** — Use [OpenNext](https://opennext.js.org/) or the [serverless-next.js](https://github.com/serverless-nextjs/serverless-nextjs) plugin to build and deploy the app so each route becomes a Lambda.
-3. **Custom Lambda + standalone** — Run `npm run build`, then use the `.next/standalone` output inside a Lambda (or container) and route requests through a custom handler that forwards to the Next.js server.
+## Notes
 
-Ensure `OPENAI_API_KEY` is set in the Lambda (or Amplify) environment variables.
-
-For the Hugging Face integration, ensure `HF_TOKEN` is configured in your Lambda (or Amplify) environment.
-
-## Tech stack
-
-- Next.js 14 (App Router)
-- React 18
-- Hugging Face Inference API (`mistralai/Mistral-7B-Instruct-v0.2`)
-- TypeScript
+- The API key is required for live AI analysis. The interface itself can load without it.
+- The Gemini model is configured in `app/api/analyze/route.ts`.
+- Never commit `.env.local` or a real API key.
