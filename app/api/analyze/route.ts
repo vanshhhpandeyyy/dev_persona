@@ -43,7 +43,7 @@ ${code}
 \`\`\``;
 
   const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/interactions",
     {
       method: "POST",
       headers: {
@@ -51,17 +51,11 @@ ${code}
         "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
-        systemInstruction: {
-          parts: [{
-            text: `You are a careful ${persona.name}. Your review focus is: ${persona.focus} Be specific. Do not invent files, dependencies, runtime behavior, or vulnerabilities. If something cannot be established from the snippet, say so. Preserve the original language and framework.`,
-          }],
-        },
-        contents: [{ role: "user", parts: [{ text: `${prompt}\n\nSource code:\n\\`\\`\\`\\n${code}\\n\\`\\`\\`` }] }],
-        generationConfig: {
-          temperature: 0.25,
-          maxOutputTokens: 1800,
-        },
+        model: "gemini-3.8-flash",
+        input: `You are a careful ${persona.name}. Your review focus is: ${persona.focus}. Be specific. Do not invent files, dependencies, runtime behavior, or vulnerabilities. If something cannot be established from the snippet, say so. Preserve the original language and framework.\n\n${prompt}`,
+        store: false,
       }),
+
       cache: "no-store",
       signal: AbortSignal.timeout(55000),
     }
@@ -76,10 +70,15 @@ ${code}
     throw new Error(message);
   }
 
-  const text = payload?.candidates?.[0]?.content?.parts
-    ?.map((part: { text?: string }) => part.text ?? "")
-    .join("")
-    .trim();
+  const text =
+    (typeof payload?.output_text === "string" && payload.output_text) ||
+    payload?.steps
+      ?.filter((step: { type?: string }) => step.type === "model_output")
+      .flatMap((step: { content?: { type?: string; text?: string }[] }) => step.content ?? [])
+      .filter((part: { type?: string }) => part.type === "text")
+      .map((part: { text?: string }) => part.text ?? "")
+      .join("")
+      .trim();
 
   if (!text) {
     throw new Error("Gemini returned an empty response. Please try again.");
