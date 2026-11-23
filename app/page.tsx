@@ -159,13 +159,13 @@ export default function Home() {
 
 function renderReview(markdown: string): ReactNode {
   const chunks: ReactNode[] = [];
-  const codeFence = /```([^\\n]*)\\n([\\s\\S]*?)```/g;
+  const codeFence = /```([^\n]*)\n([\s\S]*?)```/g;
   let cursor = 0;
   let match: RegExpExecArray | null;
   let key = 0;
 
   const renderText = (value: string) => {
-    const lines = value.split('\\n');
+    const lines = value.split('\n');
     const nodes: ReactNode[] = [];
     let paragraph: string[] = [];
     const flushParagraph = () => {
