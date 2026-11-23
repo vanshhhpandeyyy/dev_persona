@@ -45,7 +45,7 @@ ${code}
 \`\`\``;
 
   const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/interactions",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
     {
       method: "POST",
       headers: {
@@ -53,10 +53,16 @@ ${code}
         "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
-        model: "gemini-3.8-flash",
-        system_instruction: `You are a careful ${persona.name}. Your review focus is: ${persona.focus}. Be specific. Do not invent files, dependencies, runtime behavior, or vulnerabilities. If something cannot be established from the snippet, say so. Preserve the original language and framework.`,
-        input: prompt,
-        store: false,
+        systemInstruction: {
+          parts: [{
+            text: `You are a careful ${persona.name}. Your review focus is: ${persona.focus}. Be specific. Do not invent files, dependencies, runtime behavior, or vulnerabilities. If something cannot be established from the snippet, say so. Preserve the original language and framework.`,
+          }],
+        },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.25,
+          maxOutputTokens: 1800,
+        },
       }),
 
       cache: "no-store",
@@ -73,15 +79,10 @@ ${code}
     throw new Error(message);
   }
 
-  const text =
-    (typeof payload?.output_text === "string" && payload.output_text) ||
-    payload?.steps
-      ?.filter((step: { type?: string }) => step.type === "model_output")
-      .flatMap((step: { content?: { type?: string; text?: string }[] }) => step.content ?? [])
-      .filter((part: { type?: string }) => part.type === "text")
-      .map((part: { text?: string }) => part.text ?? "")
-      .join("")
-      .trim();
+  const text = payload?.candidates?.[0]?.content?.parts
+    ?.map((part: { text?: string }) => part.text ?? "")
+    .join("")
+    .trim();
 
   if (!text) {
     throw new Error("Gemini returned an empty response. Please try again.");
